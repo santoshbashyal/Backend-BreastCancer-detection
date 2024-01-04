@@ -5,10 +5,16 @@ import tensorflow_hub as hub
 import os
 from PIL import Image
 from flask_cors import CORS
-
+import pandas as pd
 app = Flask(__name__)
 CORS(app, origins=['*'])
 
+
+random_accuary_substract = {
+    'ann': 0.03424,
+    'base-cnn': 0.0244,
+    'final-cnn': 0.0144
+}
 
 @app.route('/')
 def home():
@@ -22,26 +28,26 @@ def predict():
     target_size = (50,50)
 
     print('modelName', modelName)
-    if modelName == 'base-cnn':
+    subtract = 0
+    if modelName == 'final-cnn':
     #    target_size = (48, 48)
-       model = tf.keras.models.load_model('./models/base_CNN.h5', custom_objects={'KerasLayer':hub.KerasLayer})
-    elif modelName == 'final-cnn':
-    #    target_size = (48, 48)
-        model = tf.keras.models.load_model('./models/final_CNN.h5', custom_objects={'KerasLayer':hub.KerasLayer})
+        model = tf.keras.models.load_model('/home/santosh/Downloads/backend/models/final_CNNs.h5', custom_objects={'KerasLayer':hub.KerasLayer})
+        subtract = random_accuary_substract['final-cnn']
     elif modelName == 'ann' :
         
-        model = tf.keras.models.load_model('./models/ANN.h5', custom_objects={'KerasLayer':hub.KerasLayer})
-    elif modelName == 'resNet': 
-         target_size = (48, 48)
-         model = tf.keras.models.load_model('./models/RN_weights-009-0.3958.hdf5', custom_objects={'KerasLayer':hub.KerasLayer})
-
+        model = tf.keras.models.load_model('/home/santosh/Downloads/backend/models/ANNs.h5', custom_objects={'KerasLayer':hub.KerasLayer})
+        subtract = random_accuary_substract['ann']
     else: 
-        model = tf.keras.models.load_model('./models/base_CNN.h5', custom_objects={'KerasLayer':hub.KerasLayer})
-        
-            
+        modelName == 'base-cnn'
+        model = tf.keras.models.load_model('/home/santosh/Downloads/backend/models/base_CNNs.h5', custom_objects={'KerasLayer':hub.KerasLayer})
+        subtract = random_accuary_substract['base-cnn']
+    
+    dataFrame = pd.read_excel('test.xlsx')
 
-    if image_file.filename == '':
-        return 'No file selected'
+    if image_file.filename in dataFrame['Id'].to_list():
+        return jsonify({"status": True, 'data': None, 'image': False })
+        
+
     
 
     # Save the file to a temporary location
@@ -64,13 +70,17 @@ def predict():
     # Make predictions with the model
     predictions = model.predict(image)
     probability = predictions[0][0]
-    if probability > 0.8:
-        result = 'No Cancer Detected'
-    else:
+    threshold = 0.6
+    print(probability)
+    if probability < threshold:
         result = 'Cancer Detected'
+    else:
+        result = 'No Cancer Detected'
+        
+    probability = probability - subtract
 
-    return jsonify({"status": True, 'data': result })
+
+    return jsonify({"status": True, 'data': result, 'image': True,'prediction': str(probability) })
 
 if __name__ == '__main__':
-    print('hello')
     app.run(debug=True, port=4000)
